@@ -11,6 +11,11 @@ import (
 var KeyFileName = ".git-crypt.key"
 
 func Init() error {
+	// check if .git directory exists
+	err := utils.CheckGitDirectory()
+	if err != nil {
+		return err
+	}
 	// check if key file exists
 	keyExists := false
 	if _, err := os.Stat(KeyFileName); err == nil {
@@ -27,6 +32,11 @@ func Init() error {
 			return err
 		}
 	}
+	err = utils.CheckAndFixGitConfig()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -126,33 +136,90 @@ func InitNewKey() error {
 
 }
 
-func Status() {
-	fmt.Println("Hello from git-crypt status")
+func Status() error {
+	files, err := utils.GetTrackedFiles()
+	if err != nil {
+		return fmt.Errorf("failed to get tracked files: %v", err)
+	}
+
+	for _, file := range files {
+		status, err := utils.CheckEncryptionStatus(file)
+		if err != nil {
+			fmt.Printf("Error checking file %s: %v\n", file, err)
+			continue
+		}
+
+		fmt.Printf("%13s: %s\n", status, file)
+	}
+
+	return nil
 }
 
 func Lock() {
-	fmt.Println("Hello from git-crypt lock")
-	repo, err := utils.GetWorkingDirectory()
+	symmetricKey, err := utils.GetKey(KeyFileName)
 	if err != nil {
-		log.Fatalf("Error getting working directory: %v", err)
+		log.Fatalf("Error getting key: %v", err)
 	}
-	inputFile := "ca-key.pem"
-	encryptedFile := "ca-key.pem.enc"
-	decryptedFile := "ca-key.pem.dec"
+	err = utils.Lock(symmetricKey)
+	if err != nil {
+		log.Fatalf("Error locking repository: %v", err)
+	}
+}
+
+func Unlock() {
+	symmetricKey, err := utils.GetKey(KeyFileName)
+	if err != nil {
+		log.Fatalf("Error getting key: %v", err)
+	}
+	err = utils.Unlock(symmetricKey)
+	if err != nil {
+		log.Fatalf("Error unlocking repository: %v", err)
+	}
+}
+
+func Decrypt() {
+	symmetricKey, err := utils.GetKey(KeyFileName)
+	if err != nil {
+		log.Fatalf("Error getting key: %v", err)
+	}
+	err = utils.DecryptStdinStdout(symmetricKey)
+	if err != nil {
+		log.Fatalf("Error decrypting stdin/stdout: %v", err)
+	}
+}
+
+func Encrypt() {
+	symmetricKey, err := utils.GetKey(KeyFileName)
+	if err != nil {
+		log.Fatalf("Error getting key: %v", err)
+	}
+	err = utils.EncryptStdinStdout(symmetricKey)
+	if err != nil {
+		log.Fatalf("Error encrypting stdin/stdout: %v", err)
+	}
+}
+
+func Debug() {
+	fmt.Println("Hello from git-crypt debug")
+
+	inputFile := "test.txt"
+	inputFileContent := []byte("Hello, world!")
+	err := os.WriteFile(inputFile, inputFileContent, 0600)
+	if err != nil {
+		log.Fatalf("Error writing test file %s: %v", inputFile, err)
+	}
+	encryptedFile := "test.txt.enc"
+	decryptedFile := "test.txt.dec"
 	// Encrypt a file
-	err = utils.EncryptDecryptFileMeh(inputFile, encryptedFile, repo, KeyFileName, true) // Encrypt
+	err = utils.EncryptDecryptFileMeh(inputFile, encryptedFile, KeyFileName, true) // Encrypt
 	if err != nil {
 		log.Fatalf("Error encrypting file: %v", err)
 	}
 
 	// Decrypt the file
-	err = utils.EncryptDecryptFileMeh(encryptedFile, decryptedFile, repo, KeyFileName, false) // Decrypt
+	err = utils.EncryptDecryptFileMeh(encryptedFile, decryptedFile, KeyFileName, false) // Decrypt
 	if err != nil {
 		log.Fatalf("Error decrypting file: %v", err)
 	}
 
-}
-
-func Unlock() {
-	fmt.Println("Hello from git-crypt unlock")
 }

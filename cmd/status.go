@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"github.com/pamelia/git-crypt/pkg/gitcrypt"
 
 	"github.com/spf13/cobra"
@@ -11,7 +12,11 @@ var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Display which files are encrypted",
 	Run: func(cmd *cobra.Command, args []string) {
-		gitcrypt.Status()
+		err := gitcrypt.Status()
+		if err != nil {
+			fmt.Printf("Error: %s\n", err.Error())
+
+		}
 	},
 }
 

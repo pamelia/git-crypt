@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"fmt"
+	"github.com/pamelia/git-crypt/pkg/gitcrypt"
 
 	"github.com/spf13/cobra"
 )
@@ -11,7 +11,7 @@ var smudgeCmd = &cobra.Command{
 	Use:   "smudge",
 	Short: "A brief description of your command",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("smudge called")
+		gitcrypt.Decrypt()
 	},
 }
 

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/pamelia/git-crypt/pkg/constants"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -8,8 +9,9 @@ import (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "git-crypt",
-	Short: "Transparent file encryption in git",
+	Use:     "git-crypt",
+	Short:   "Transparent file encryption in git",
+	Version: constants.Version,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"github.com/pamelia/git-crypt/pkg/constants"
 	"github.com/zalando/go-keyring"
 	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/crypto/ssh/terminal"
@@ -17,9 +18,6 @@ import (
 	"path/filepath"
 	"strings"
 )
-
-// FileHeader is a predefined marker to identify encrypted files
-var FileHeader = []byte("GITCRYPT")
 
 func ReadPassword(msg string) (string, error) {
 	fmt.Print(msg)
@@ -47,7 +45,7 @@ func GeneratePassword() (string, error) {
 }
 
 func DeriveKey(password string, salt []byte) []byte {
-	return pbkdf2.Key([]byte(password), salt, 100000, 32, sha256.New)
+	return pbkdf2.Key([]byte(password), salt, 200000, 32, sha256.New)
 }
 
 func EncryptData(data, key []byte) ([]byte, error) {
@@ -130,12 +128,12 @@ func isEncrypted(data []byte) bool {
 	}
 
 	// Check if the remaining data is long enough to contain the header
-	if len(data) < len(FileHeader) {
+	if len(data) < len(constants.FileHeader) {
 		return false
 	}
 
 	// Compare the file header
-	return string(data[:len(FileHeader)]) == string(FileHeader)
+	return string(data[:len(constants.FileHeader)]) == string(constants.FileHeader)
 }
 
 func EncryptFileContent(data, key []byte) ([]byte, error) {
@@ -145,7 +143,7 @@ func EncryptFileContent(data, key []byte) ([]byte, error) {
 	}
 
 	// Prepend the file header to the encrypted data
-	return append(FileHeader, encryptedData...), nil
+	return append(constants.FileHeader, encryptedData...), nil
 }
 
 func decryptFileContent(data, key []byte) ([]byte, error) {
@@ -154,7 +152,7 @@ func decryptFileContent(data, key []byte) ([]byte, error) {
 	}
 
 	// Remove the file header
-	encryptedData := data[len(FileHeader):]
+	encryptedData := data[len(constants.FileHeader):]
 
 	return DecryptData(encryptedData, key)
 }

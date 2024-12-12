@@ -8,6 +8,7 @@ import (
 	"github.com/zalando/go-keyring"
 	"log"
 	"os"
+	"os/exec"
 )
 
 func Init() error {
@@ -155,26 +156,99 @@ func Status() error {
 	return nil
 }
 
-func Lock() {
+func Lock() error {
 	symmetricKey, err := utils.GetKey(constants.KeyFileName)
 	if err != nil {
 		log.Fatalf("Error getting key: %v", err)
 	}
-	err = utils.Lock(symmetricKey)
+	// Get the list of files with the `filter=git-crypt` attribute
+	files, err := utils.GetGitCryptFiles()
 	if err != nil {
-		log.Fatalf("Error locking repository: %v", err)
+		return fmt.Errorf("failed to get git-crypt files: %v", err)
 	}
+
+	for _, file := range files {
+		fmt.Printf("Locking file %s...\n", file)
+		// Read the file content
+		data, err := os.ReadFile(file)
+		if err != nil {
+			return fmt.Errorf("failed to read file %s: %v", file, err)
+		}
+
+		// Skip files that are already encrypted
+		if services.IsEncrypted(data) {
+			continue
+		}
+
+		// Encrypt the file
+		encryptedData, err := services.EncryptFileContent(data, symmetricKey)
+		if err != nil {
+			return fmt.Errorf("failed to encrypt file %s: %v", file, err)
+		}
+
+		// Write the encrypted content back to the file
+		err = os.WriteFile(file, encryptedData, 0644)
+		if err != nil {
+			return fmt.Errorf("failed to write encrypted file %s: %v", file, err)
+		}
+	}
+
+	// Update Git index to match the working directory
+	err = exec.Command("git", "update-index", "--refresh").Run()
+	if err != nil {
+		return fmt.Errorf("failed to update Git index: %v", err)
+	}
+
+	fmt.Println("All files locked successfully.")
+	return nil
 }
 
-func Unlock() {
+func Unlock() error {
 	symmetricKey, err := utils.GetKey(constants.KeyFileName)
 	if err != nil {
 		log.Fatalf("Error getting key: %v", err)
 	}
-	err = utils.Unlock(symmetricKey)
+	// Get the list of files with the `filter=git-crypt` attribute
+	files, err := utils.GetGitCryptFiles()
 	if err != nil {
-		log.Fatalf("Error unlocking repository: %v", err)
+		return fmt.Errorf("failed to get git-crypt files: %v", err)
 	}
+
+	for _, file := range files {
+		fmt.Printf("Unlocking file %s...\n", file)
+		// Read the file content
+		data, err := os.ReadFile(file)
+		if err != nil {
+			return fmt.Errorf("failed to read file %s: %v", file, err)
+		}
+
+		// Skip files that are already plaintext
+		if !services.IsEncrypted(data) {
+			fmt.Printf("File %s is already plaintext.\n", file)
+			continue
+		}
+
+		// Decrypt the file
+		plaintext, err := services.DecryptFileContent(data, symmetricKey)
+		if err != nil {
+			return fmt.Errorf("failed to decrypt file %s: %v", file, err)
+		}
+
+		// Write the plaintext content back to the file
+		err = os.WriteFile(file, plaintext, 0644)
+		if err != nil {
+			return fmt.Errorf("failed to write decrypted file %s: %v", file, err)
+		}
+	}
+
+	// Update Git index to match the working directory
+	err = exec.Command("git", "update-index", "--refresh").Run()
+	if err != nil {
+		return fmt.Errorf("failed to update Git index: %v", err)
+	}
+
+	fmt.Println("All files unlocked successfully.")
+	return nil
 }
 
 func Decrypt() {

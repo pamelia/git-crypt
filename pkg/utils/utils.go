@@ -151,7 +151,7 @@ func CheckAndFixGitConfig() error {
 	return nil
 }
 
-func getGitCryptFiles() ([]string, error) {
+func GetGitCryptFiles() ([]string, error) {
 	// Open the .gitattributes file
 	file, err := os.Open(".gitattributes")
 	if err != nil {
@@ -210,93 +210,6 @@ func getGitCryptFiles() ([]string, error) {
 	}
 
 	return files, nil
-}
-
-func Lock(symmetricKey []byte) error {
-	// Get the list of files with the `filter=git-crypt` attribute
-	files, err := getGitCryptFiles()
-	if err != nil {
-		return fmt.Errorf("failed to get git-crypt files: %v", err)
-	}
-
-	for _, file := range files {
-		fmt.Printf("Locking file %s...\n", file)
-		// Read the file content
-		data, err := os.ReadFile(file)
-		if err != nil {
-			return fmt.Errorf("failed to read file %s: %v", file, err)
-		}
-
-		// Skip files that are already encrypted
-		if services.IsEncrypted(data) {
-			continue
-		}
-
-		// Encrypt the file
-		encryptedData, err := services.EncryptFileContent(data, symmetricKey)
-		if err != nil {
-			return fmt.Errorf("failed to encrypt file %s: %v", file, err)
-		}
-
-		// Write the encrypted content back to the file
-		err = os.WriteFile(file, encryptedData, 0644)
-		if err != nil {
-			return fmt.Errorf("failed to write encrypted file %s: %v", file, err)
-		}
-	}
-
-	// Update Git index to match the working directory
-	err = exec.Command("git", "update-index", "--refresh").Run()
-	if err != nil {
-		return fmt.Errorf("failed to update Git index: %v", err)
-	}
-
-	fmt.Println("All files locked successfully.")
-	return nil
-}
-
-func Unlock(symmetricKey []byte) error {
-	// Get the list of files with the `filter=git-crypt` attribute
-	files, err := getGitCryptFiles()
-	if err != nil {
-		return fmt.Errorf("failed to get git-crypt files: %v", err)
-	}
-
-	for _, file := range files {
-		fmt.Printf("Unlocking file %s...\n", file)
-		// Read the file content
-		data, err := os.ReadFile(file)
-		if err != nil {
-			return fmt.Errorf("failed to read file %s: %v", file, err)
-		}
-
-		// Skip files that are already plaintext
-		if !services.IsEncrypted(data) {
-			fmt.Printf("File %s is already plaintext.\n", file)
-			continue
-		}
-
-		// Decrypt the file
-		plaintext, err := services.DecryptFileContent(data, symmetricKey)
-		if err != nil {
-			return fmt.Errorf("failed to decrypt file %s: %v", file, err)
-		}
-
-		// Write the plaintext content back to the file
-		err = os.WriteFile(file, plaintext, 0644)
-		if err != nil {
-			return fmt.Errorf("failed to write decrypted file %s: %v", file, err)
-		}
-	}
-
-	// Update Git index to match the working directory
-	err = exec.Command("git", "update-index", "--refresh").Run()
-	if err != nil {
-		return fmt.Errorf("failed to update Git index: %v", err)
-	}
-
-	fmt.Println("All files unlocked successfully.")
-	return nil
 }
 
 func EncryptDecryptFileMeh(inputPath, outputPath, keyfilePath string, encrypt bool) error {

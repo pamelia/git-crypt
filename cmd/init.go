@@ -9,7 +9,7 @@ import (
 // initCmd represents the init command
 var initCmd = &cobra.Command{
 	Use:   "init",
-	Short: "A brief description of your command",
+	Short: "Generate a key and prepare repo to use git-crypt",
 	Run: func(cmd *cobra.Command, args []string) {
 		err := gitcrypt.Init()
 		if err != nil {

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"github.com/pamelia/git-crypt/pkg/services"
 	"github.com/zalando/go-keyring"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,7 +16,7 @@ import (
 
 func ReadPassword(msg string) (string, error) {
 	fmt.Print(msg)
-	bytePassword, err := terminal.ReadPassword(int(os.Stdin.Fd()))
+	bytePassword, err := term.ReadPassword(int(os.Stdin.Fd()))
 	fmt.Println()
 	if err != nil {
 		return "", err
@@ -274,16 +274,4 @@ func GetTrackedFiles() ([]string, error) {
 
 	files := strings.Split(strings.TrimSpace(string(output)), "\n")
 	return files, nil
-}
-
-func CheckEncryptionStatus(file string) (string, error) {
-	data, err := os.ReadFile(file)
-	if err != nil {
-		return "", fmt.Errorf("failed to read file: %v", err)
-	}
-
-	if services.IsEncrypted(data) {
-		return "encrypted", nil
-	}
-	return "not encrypted", nil
 }

@@ -75,3 +75,15 @@ func EncryptStdinStdout(symmetricKey []byte) error {
 
 	return nil
 }
+
+func CheckEncryptionStatus(file string) (string, error) {
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return "", fmt.Errorf("failed to read file: %v", err)
+	}
+
+	if IsEncrypted(data) {
+		return "encrypted", nil
+	}
+	return "not encrypted", nil
+}

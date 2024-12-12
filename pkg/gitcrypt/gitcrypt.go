@@ -144,7 +144,7 @@ func Status() error {
 	}
 
 	for _, file := range files {
-		status, err := utils.CheckEncryptionStatus(file)
+		status, err := services.CheckEncryptionStatus(file)
 		if err != nil {
 			fmt.Printf("Error checking file %s: %v\n", file, err)
 			continue

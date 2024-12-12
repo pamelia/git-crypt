@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -168,4 +169,13 @@ func GetGitCryptFiles() ([]string, error) {
 	}
 
 	return files, nil
+}
+
+func GetRepoName() (string, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	dirName := filepath.Base(wd)
+	return dirName, nil
 }

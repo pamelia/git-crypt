@@ -5,13 +5,11 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"github.com/pamelia/git-crypt/pkg/constants"
 	"github.com/pamelia/git-crypt/pkg/services"
 	"github.com/zalando/go-keyring"
-	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/crypto/ssh/terminal"
 	"io"
 	"os"
@@ -43,10 +41,6 @@ func GeneratePassword() (string, error) {
 		return "", fmt.Errorf("passwords do not match")
 	}
 	return passwd, nil
-}
-
-func DeriveKey(password string, salt []byte) []byte {
-	return pbkdf2.Key([]byte(password), salt, 200000, 32, sha256.New)
 }
 
 func EncryptData(data, key []byte) ([]byte, error) {
@@ -113,7 +107,7 @@ func GetKey(keyFileName string) ([]byte, error) {
 	}
 
 	salt, encryptedKey := data[:16], data[16:]
-	derivedKey := DeriveKey(password, salt)
+	derivedKey := services.DeriveKey(password, salt)
 	symmetricKey, err := DecryptData(encryptedKey, derivedKey)
 	if err != nil {
 		return []byte{}, fmt.Errorf("failed to decrypt symmetric key: %v", err)

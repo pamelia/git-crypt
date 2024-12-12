@@ -1,6 +1,10 @@
 package services
 
-import "github.com/pamelia/git-crypt/pkg/constants"
+import (
+	"crypto/sha256"
+	"github.com/pamelia/git-crypt/pkg/constants"
+	"golang.org/x/crypto/pbkdf2"
+)
 
 func IsEncrypted(data []byte) bool {
 	// Skip leading null bytes
@@ -15,4 +19,8 @@ func IsEncrypted(data []byte) bool {
 
 	// Compare the file header
 	return string(data[:len(constants.FileHeader)]) == string(constants.FileHeader)
+}
+
+func DeriveKey(password string, salt []byte) []byte {
+	return pbkdf2.Key([]byte(password), salt, 200000, 32, sha256.New)
 }

@@ -2,6 +2,7 @@ package gitcrypt
 
 import (
 	"fmt"
+	"github.com/pamelia/git-crypt/pkg/services"
 	"github.com/pamelia/git-crypt/pkg/utils"
 	"github.com/zalando/go-keyring"
 	"log"
@@ -71,7 +72,7 @@ func InitKeyExists() error {
 	salt, encryptedKey := data[:16], data[16:]
 
 	// Derive the decryption key from the provided password
-	derivedKey := utils.DeriveKey(userPassword, salt)
+	derivedKey := services.DeriveKey(userPassword, salt)
 
 	_, err = utils.DecryptData(encryptedKey, derivedKey)
 	if err != nil {
@@ -106,7 +107,7 @@ func InitNewKey() error {
 	if err != nil {
 		return fmt.Errorf("failed to generate salt: %v", err)
 	}
-	derivedKey := utils.DeriveKey(password, salt)
+	derivedKey := services.DeriveKey(password, salt)
 
 	// Step 4: Encrypt the symmetric key with the derived key
 	encryptedKey, err := utils.EncryptData(symmetricKey, derivedKey)

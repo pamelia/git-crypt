@@ -11,20 +11,30 @@ import (
 )
 
 func DecryptData(encrypted, key []byte) ([]byte, error) {
+	// Create a new AES cipher
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
 	}
+	// Create GCM (Galois/Counter Mode)
 	aesGCM, err := cipher.NewGCM(block)
 	if err != nil {
 		return nil, err
 	}
+	// Separate the nonce and the ciphertext
 	nonceSize := aesGCM.NonceSize()
 	if len(encrypted) < nonceSize {
 		return nil, fmt.Errorf("ciphertext too short")
 	}
 	nonce, ciphertext := encrypted[:nonceSize], encrypted[nonceSize:]
-	return aesGCM.Open(nil, nonce, ciphertext, nil)
+
+	// Decrypt the data with the nonce and key
+	plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt: %v", err)
+	}
+
+	return plaintext, nil
 }
 
 func DecryptFileContent(data, key []byte) ([]byte, error) {

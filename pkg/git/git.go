@@ -62,7 +62,7 @@ func appendGitConfig() error {
 	return nil
 }
 
-func CheckAndFixGitConfig() error {
+func SetupGitConfig() error {
 	filterExists, err := checkGitConfig("[filter \"git-crypt\"]")
 	if err != nil {
 		return err
@@ -111,7 +111,6 @@ func CheckGitDirectory() error {
 }
 
 func GetGitCryptFiles() ([]string, error) {
-	// Open the .gitattributes file
 	file, err := os.Open(".gitattributes")
 	if err != nil {
 		if os.IsNotExist(err) {

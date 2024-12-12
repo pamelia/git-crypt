@@ -13,12 +13,13 @@ import (
 )
 
 func Init() error {
-	// check if .git directory exists
+	// Check if .git directory exists
 	err := git.CheckGitDirectory()
 	if err != nil {
 		return err
 	}
-	// check if key file exists
+
+	// Check if key file exists
 	keyExists := false
 	if _, err := os.Stat(constants.KeyFileName); err == nil {
 		keyExists = true
@@ -34,7 +35,8 @@ func Init() error {
 			return err
 		}
 	}
-	err = git.CheckAndFixGitConfig()
+
+	err = git.SetupGitConfig()
 	if err != nil {
 		return err
 	}
@@ -43,25 +45,23 @@ func Init() error {
 }
 
 func InitKeyExists() error {
+	// Get the repo name
 	repo, err := git.GetRepoName()
 	if err != nil {
 		return fmt.Errorf("failed to get working directory: %v", err)
 	}
 
-	// Attempt to retrieve the password from the keyring
 	_, err = keyring.Get("git-crypt", repo)
 	if err == nil {
 		// Password already exists in the keyring
-		fmt.Println("Password found in keyring.")
+		fmt.Println("Password found in keyring, skipping initialization.")
 		return nil
 	}
 
-	// Ask for password
 	userPassword, err := utils.ReadPassword("Enter password to decrypt key: ")
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Ok trying to decrypt key using password %s\n", userPassword)
 
 	// Validate the password by attempting to decrypt the encrypted key file
 	data, err := os.ReadFile(constants.KeyFileName)
@@ -75,6 +75,7 @@ func InitKeyExists() error {
 	// Derive the decryption key from the provided password
 	derivedKey := cryptotools.DeriveKey(userPassword, salt)
 
+	// Decrypt the encrypted key
 	_, err = cryptotools.DecryptData(encryptedKey, derivedKey)
 	if err != nil {
 		return fmt.Errorf("failed to decrypt key: %v", err)
@@ -92,42 +93,45 @@ func InitKeyExists() error {
 }
 
 func InitNewKey() error {
-	// Step 1: Prompt the user for a password
+	// Prompt the user for a password
 	password, err := utils.GeneratePassword()
 	if err != nil {
 		return fmt.Errorf("failed to generate password: %v", err)
 	}
-	// Step 2: Generate a new symmetric key
+
+	// Generate a new symmetric key
 	symmetricKey, err := utils.GenerateRandomBytes(32) // 256-bit key
 	if err != nil {
 		return fmt.Errorf("failed to generate key: %v", err)
 	}
 
-	// Step 3: Derive an encryption key from the password
+	// Derive an encryption key from the password
 	salt, err := utils.GenerateRandomBytes(16) // 128-bit salt
 	if err != nil {
 		return fmt.Errorf("failed to generate salt: %v", err)
 	}
 	derivedKey := cryptotools.DeriveKey(password, salt)
 
-	// Step 4: Encrypt the symmetric key with the derived key
+	// Encrypt the symmetric key with the derived key
 	encryptedKey, err := cryptotools.EncryptData(symmetricKey, derivedKey)
 	if err != nil {
 		return fmt.Errorf("failed to encrypt key: %v", err)
 	}
 
-	// Step 5: Save the salt and encrypted key to disk
+	// Save the salt and encrypted key to disk
 	dataToSave := append(salt, encryptedKey...)
 	err = os.WriteFile(".git-crypt.key", dataToSave, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to save encrypted key to disk: %v", err)
 	}
 
-	// Step 6: Save the password to the system keyring
+	// Get the repo name
 	repo, err := git.GetRepoName()
 	if err != nil {
 		return fmt.Errorf("failed to get working directory: %v", err)
 	}
+
+	// Save the password to the system keyring
 	err = keyring.Set("git-crypt", repo, password)
 	if err != nil {
 		return fmt.Errorf("failed to save password to keyring: %v", err)
@@ -139,11 +143,13 @@ func InitNewKey() error {
 }
 
 func Status() error {
+	// Get the list of tracked files
 	files, err := git.GetTrackedFiles()
 	if err != nil {
 		return fmt.Errorf("failed to get tracked files: %v", err)
 	}
 
+	// Check the encryption status of each file
 	for _, file := range files {
 		status, err := cryptotools.CheckEncryptionStatus(file)
 		if err != nil {
@@ -158,6 +164,7 @@ func Status() error {
 }
 
 func Lock() error {
+	// Get the symmetric key
 	symmetricKey, err := cryptotools.GetKey(constants.KeyFileName)
 	if err != nil {
 		return fmt.Errorf("failed to get key: %v", err)
@@ -168,6 +175,7 @@ func Lock() error {
 		return fmt.Errorf("failed to get git-crypt files: %v", err)
 	}
 
+	// Lock each file
 	for _, file := range files {
 		fmt.Printf("Locking file %s...\n", file)
 		// Read the file content
@@ -205,6 +213,7 @@ func Lock() error {
 }
 
 func Unlock() error {
+	// Get the symmetric key
 	symmetricKey, err := cryptotools.GetKey(constants.KeyFileName)
 	if err != nil {
 		return fmt.Errorf("failed to get key: %v", err)
@@ -215,6 +224,7 @@ func Unlock() error {
 		return fmt.Errorf("failed to get git-crypt files: %v", err)
 	}
 
+	// Unlock each file
 	for _, file := range files {
 		fmt.Printf("Unlocking file %s...\n", file)
 		// Read the file content
@@ -253,10 +263,13 @@ func Unlock() error {
 }
 
 func Decrypt() error {
+	// Get the symmetric key
 	symmetricKey, err := cryptotools.GetKey(constants.KeyFileName)
 	if err != nil {
 		return fmt.Errorf("failed to get key: %v", err)
 	}
+
+	// Decrypt stdin/stdout
 	err = cryptotools.DecryptStdinStdout(symmetricKey)
 	if err != nil {
 		log.Fatalf("Error decrypting stdin/stdout: %v", err)
@@ -265,10 +278,13 @@ func Decrypt() error {
 }
 
 func Encrypt() error {
+	// Get the symmetric key
 	symmetricKey, err := cryptotools.GetKey(constants.KeyFileName)
 	if err != nil {
 		return fmt.Errorf("failed to get key: %v", err)
 	}
+
+	// Encrypt stdin/stdout
 	err = cryptotools.EncryptStdinStdout(symmetricKey)
 	if err != nil {
 		log.Fatalf("Error encrypting stdin/stdout: %v", err)
@@ -277,8 +293,6 @@ func Encrypt() error {
 }
 
 func Debug() error {
-	fmt.Println("Hello from git-crypt debug")
-
 	inputFile := "test.txt"
 	inputFileContent := []byte("Hello, world!")
 	err := os.WriteFile(inputFile, inputFileContent, 0600)
@@ -287,13 +301,11 @@ func Debug() error {
 	}
 	encryptedFile := "test.txt.enc"
 	decryptedFile := "test.txt.dec"
-	// Encrypt a file
 	err = cryptotools.EncryptDecryptFile(inputFile, encryptedFile, constants.KeyFileName, true) // Encrypt
 	if err != nil {
 		return fmt.Errorf("failed to encrypt file: %v", err)
 	}
 
-	// Decrypt the file
 	err = cryptotools.EncryptDecryptFile(encryptedFile, decryptedFile, constants.KeyFileName, false) // Decrypt
 	if err != nil {
 		return fmt.Errorf("failed to decrypt file: %v", err)

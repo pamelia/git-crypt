@@ -43,7 +43,7 @@ func Init() error {
 }
 
 func InitKeyExists() error {
-	repo, err := utils.GetWorkingDirectory()
+	repo, err := git.GetRepoName()
 	if err != nil {
 		return fmt.Errorf("failed to get working directory: %v", err)
 	}
@@ -124,7 +124,7 @@ func InitNewKey() error {
 	}
 
 	// Step 6: Save the password to the system keyring
-	repo, err := utils.GetWorkingDirectory()
+	repo, err := git.GetRepoName()
 	if err != nil {
 		return fmt.Errorf("failed to get working directory: %v", err)
 	}
@@ -158,7 +158,7 @@ func Status() error {
 }
 
 func Lock() error {
-	symmetricKey, err := utils.GetKey(constants.KeyFileName)
+	symmetricKey, err := crypto.GetKey(constants.KeyFileName)
 	if err != nil {
 		log.Fatalf("Error getting key: %v", err)
 	}
@@ -205,7 +205,7 @@ func Lock() error {
 }
 
 func Unlock() error {
-	symmetricKey, err := utils.GetKey(constants.KeyFileName)
+	symmetricKey, err := crypto.GetKey(constants.KeyFileName)
 	if err != nil {
 		log.Fatalf("Error getting key: %v", err)
 	}
@@ -253,7 +253,7 @@ func Unlock() error {
 }
 
 func Decrypt() {
-	symmetricKey, err := utils.GetKey(constants.KeyFileName)
+	symmetricKey, err := crypto.GetKey(constants.KeyFileName)
 	if err != nil {
 		log.Fatalf("Error getting key: %v", err)
 	}
@@ -264,7 +264,7 @@ func Decrypt() {
 }
 
 func Encrypt() {
-	symmetricKey, err := utils.GetKey(constants.KeyFileName)
+	symmetricKey, err := crypto.GetKey(constants.KeyFileName)
 	if err != nil {
 		log.Fatalf("Error getting key: %v", err)
 	}
@@ -286,13 +286,13 @@ func Debug() {
 	encryptedFile := "test.txt.enc"
 	decryptedFile := "test.txt.dec"
 	// Encrypt a file
-	err = utils.EncryptDecryptFileMeh(inputFile, encryptedFile, constants.KeyFileName, true) // Encrypt
+	err = crypto.EncryptDecryptFile(inputFile, encryptedFile, constants.KeyFileName, true) // Encrypt
 	if err != nil {
 		log.Fatalf("Error encrypting file: %v", err)
 	}
 
 	// Decrypt the file
-	err = utils.EncryptDecryptFileMeh(encryptedFile, decryptedFile, constants.KeyFileName, false) // Decrypt
+	err = crypto.EncryptDecryptFile(encryptedFile, decryptedFile, constants.KeyFileName, false) // Decrypt
 	if err != nil {
 		log.Fatalf("Error decrypting file: %v", err)
 	}

@@ -87,3 +87,36 @@ func CheckEncryptionStatus(file string) (string, error) {
 	}
 	return "not encrypted", nil
 }
+
+func EncryptDecryptFile(inputPath, outputPath, keyfilePath string, encrypt bool) error {
+	symmetricKey, err := GetKey(keyfilePath)
+	if err != nil {
+		return fmt.Errorf("failed to get key: %v", err)
+	}
+
+	fileData, err := os.ReadFile(inputPath)
+	if err != nil {
+		return fmt.Errorf("failed to read input file: %v", err)
+	}
+
+	var outputData []byte
+	if encrypt {
+		outputData, err = EncryptFileContent(fileData, symmetricKey)
+		if err != nil {
+			return fmt.Errorf("failed to encrypt file: %v", err)
+		}
+	} else {
+		outputData, err = DecryptFileContent(fileData, symmetricKey)
+		if err != nil {
+			return fmt.Errorf("failed to decrypt file: %v", err)
+		}
+	}
+
+	err = os.WriteFile(outputPath, outputData, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to write output file: %v", err)
+	}
+
+	fmt.Printf("File successfully %s and saved to %s\n", map[bool]string{true: "encrypted", false: "decrypted"}[encrypt], outputPath)
+	return nil
+}

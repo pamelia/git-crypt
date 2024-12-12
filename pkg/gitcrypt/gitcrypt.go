@@ -3,6 +3,7 @@ package gitcrypt
 import (
 	"fmt"
 	"github.com/pamelia/git-crypt/pkg/constants"
+	"github.com/pamelia/git-crypt/pkg/git"
 	"github.com/pamelia/git-crypt/pkg/services"
 	"github.com/pamelia/git-crypt/pkg/utils"
 	"github.com/zalando/go-keyring"
@@ -33,7 +34,7 @@ func Init() error {
 			return err
 		}
 	}
-	err = utils.CheckAndFixGitConfig()
+	err = git.CheckAndFixGitConfig()
 	if err != nil {
 		return err
 	}
@@ -138,7 +139,7 @@ func InitNewKey() error {
 }
 
 func Status() error {
-	files, err := utils.GetTrackedFiles()
+	files, err := git.GetTrackedFiles()
 	if err != nil {
 		return fmt.Errorf("failed to get tracked files: %v", err)
 	}

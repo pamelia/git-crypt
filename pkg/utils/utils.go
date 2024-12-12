@@ -18,7 +18,7 @@ func ReadPassword(msg string) (string, error) {
 }
 
 func GeneratePassword() (string, error) {
-	passwd, err := ReadPassword("Enter password to encrypt key: ")
+	passwd1, err := ReadPassword("Enter password to encrypt key: ")
 	if err != nil {
 		return "", err
 	}
@@ -26,10 +26,10 @@ func GeneratePassword() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if passwd != passwd2 {
+	if passwd1 != passwd2 {
 		return "", fmt.Errorf("passwords do not match")
 	}
-	return passwd, nil
+	return passwd1, nil
 }
 
 func GenerateRandomBytes(length int) ([]byte, error) {

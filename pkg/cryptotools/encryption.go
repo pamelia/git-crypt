@@ -32,19 +32,26 @@ func DeriveKey(password string, salt []byte) []byte {
 }
 
 func EncryptData(data, key []byte) ([]byte, error) {
+	// Create a new AES cipher
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
 	}
+	// Create GCM (Galois/Counter Mode)
 	aesGCM, err := cipher.NewGCM(block)
 	if err != nil {
 		return nil, err
 	}
+	// Generate a random nonce
 	nonce := make([]byte, aesGCM.NonceSize())
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		return nil, err
 	}
-	return aesGCM.Seal(nonce, nonce, data, nil), nil
+
+	// Encrypt the data with the nonce and key
+	ciphertext := aesGCM.Seal(nonce, nonce, data, nil)
+
+	return ciphertext, nil
 }
 
 func EncryptFileContent(data, key []byte) ([]byte, error) {

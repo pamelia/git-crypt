@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/pamelia/git-crypt/pkg/utils"
 	"github.com/zalando/go-keyring"
+	"log"
 	"os"
 )
 
@@ -30,14 +31,13 @@ func Init() error {
 }
 
 func InitKeyExists() error {
-	wd, err := utils.GetWorkingDirectory()
+	repo, err := utils.GetWorkingDirectory()
 	if err != nil {
 		return fmt.Errorf("failed to get working directory: %v", err)
 	}
-	fmt.Printf("Working directory: %s\n", wd)
 
 	// Attempt to retrieve the password from the keyring
-	_, err = keyring.Get("git-crypt", wd)
+	_, err = keyring.Get("git-crypt", repo)
 	if err == nil {
 		// Password already exists in the keyring
 		fmt.Println("Password found in keyring.")
@@ -69,8 +69,7 @@ func InitKeyExists() error {
 	}
 
 	// Save the password to the system keyring
-
-	err = keyring.Set("git-crypt", wd, userPassword)
+	err = keyring.Set("git-crypt", repo, userPassword)
 	if err != nil {
 		return fmt.Errorf("failed to save password to keyring: %v", err)
 	}
@@ -113,12 +112,11 @@ func InitNewKey() error {
 	}
 
 	// Step 6: Save the password to the system keyring
-	// Use working directory as the account name
-	wd, err := utils.GetWorkingDirectory()
+	repo, err := utils.GetWorkingDirectory()
 	if err != nil {
 		return fmt.Errorf("failed to get working directory: %v", err)
 	}
-	err = keyring.Set("git-crypt", wd, password)
+	err = keyring.Set("git-crypt", repo, password)
 	if err != nil {
 		return fmt.Errorf("failed to save password to keyring: %v", err)
 	}
@@ -134,6 +132,25 @@ func Status() {
 
 func Lock() {
 	fmt.Println("Hello from git-crypt lock")
+	repo, err := utils.GetWorkingDirectory()
+	if err != nil {
+		log.Fatalf("Error getting working directory: %v", err)
+	}
+	inputFile := "ca-key.pem"
+	encryptedFile := "ca-key.pem.enc"
+	decryptedFile := "ca-key.pem.dec"
+	// Encrypt a file
+	err = utils.EncryptDecryptFileMeh(inputFile, encryptedFile, repo, KeyFileName, true) // Encrypt
+	if err != nil {
+		log.Fatalf("Error encrypting file: %v", err)
+	}
+
+	// Decrypt the file
+	err = utils.EncryptDecryptFileMeh(encryptedFile, decryptedFile, repo, KeyFileName, false) // Decrypt
+	if err != nil {
+		log.Fatalf("Error decrypting file: %v", err)
+	}
+
 }
 
 func Unlock() {

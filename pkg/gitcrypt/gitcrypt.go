@@ -74,7 +74,7 @@ func InitKeyExists() error {
 	// Derive the decryption key from the provided password
 	derivedKey := services.DeriveKey(userPassword, salt)
 
-	_, err = utils.DecryptData(encryptedKey, derivedKey)
+	_, err = services.DecryptData(encryptedKey, derivedKey)
 	if err != nil {
 		return fmt.Errorf("failed to decrypt key: %v", err)
 	}
@@ -110,7 +110,7 @@ func InitNewKey() error {
 	derivedKey := services.DeriveKey(password, salt)
 
 	// Step 4: Encrypt the symmetric key with the derived key
-	encryptedKey, err := utils.EncryptData(symmetricKey, derivedKey)
+	encryptedKey, err := services.EncryptData(symmetricKey, derivedKey)
 	if err != nil {
 		return fmt.Errorf("failed to encrypt key: %v", err)
 	}
@@ -183,7 +183,7 @@ func Decrypt() {
 	if err != nil {
 		log.Fatalf("Error getting key: %v", err)
 	}
-	err = utils.DecryptStdinStdout(symmetricKey)
+	err = services.DecryptStdinStdout(symmetricKey)
 	if err != nil {
 		log.Fatalf("Error decrypting stdin/stdout: %v", err)
 	}
@@ -194,7 +194,7 @@ func Encrypt() {
 	if err != nil {
 		log.Fatalf("Error getting key: %v", err)
 	}
-	err = utils.EncryptStdinStdout(symmetricKey)
+	err = services.EncryptStdinStdout(symmetricKey)
 	if err != nil {
 		log.Fatalf("Error encrypting stdin/stdout: %v", err)
 	}

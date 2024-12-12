@@ -2,16 +2,12 @@ package utils
 
 import (
 	"bufio"
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"github.com/pamelia/git-crypt/pkg/constants"
 	"github.com/pamelia/git-crypt/pkg/services"
 	"github.com/zalando/go-keyring"
 	"golang.org/x/crypto/ssh/terminal"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -41,39 +37,6 @@ func GeneratePassword() (string, error) {
 		return "", fmt.Errorf("passwords do not match")
 	}
 	return passwd, nil
-}
-
-func EncryptData(data, key []byte) ([]byte, error) {
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-	aesGCM, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, err
-	}
-	nonce := make([]byte, aesGCM.NonceSize())
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return nil, err
-	}
-	return aesGCM.Seal(nonce, nonce, data, nil), nil
-}
-
-func DecryptData(encrypted, key []byte) ([]byte, error) {
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-	aesGCM, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, err
-	}
-	nonceSize := aesGCM.NonceSize()
-	if len(encrypted) < nonceSize {
-		return nil, fmt.Errorf("ciphertext too short")
-	}
-	nonce, ciphertext := encrypted[:nonceSize], encrypted[nonceSize:]
-	return aesGCM.Open(nil, nonce, ciphertext, nil)
 }
 
 func GenerateRandomBytes(length int) ([]byte, error) {
@@ -108,71 +71,12 @@ func GetKey(keyFileName string) ([]byte, error) {
 
 	salt, encryptedKey := data[:16], data[16:]
 	derivedKey := services.DeriveKey(password, salt)
-	symmetricKey, err := DecryptData(encryptedKey, derivedKey)
+	symmetricKey, err := services.DecryptData(encryptedKey, derivedKey)
 	if err != nil {
 		return []byte{}, fmt.Errorf("failed to decrypt symmetric key: %v", err)
 	}
 
 	return symmetricKey, nil
-}
-
-func EncryptFileContent(data, key []byte) ([]byte, error) {
-	encryptedData, err := EncryptData(data, key)
-	if err != nil {
-		return nil, err
-	}
-
-	// Prepend the file header to the encrypted data
-	return append(constants.FileHeader, encryptedData...), nil
-}
-
-func decryptFileContent(data, key []byte) ([]byte, error) {
-	if !services.IsEncrypted(data) {
-		return nil, errors.New("file does not have a valid encryption header")
-	}
-
-	// Remove the file header
-	encryptedData := data[len(constants.FileHeader):]
-
-	return DecryptData(encryptedData, key)
-}
-
-func DecryptStdinStdout(symmetricKey []byte) error {
-	data, err := io.ReadAll(os.Stdin)
-	if err != nil {
-		return fmt.Errorf("failed to read from stdin: %v", err)
-	}
-
-	decryptedData, err := decryptFileContent(data, symmetricKey)
-	if err != nil {
-		return fmt.Errorf("failed to decrypt data: %v", err)
-	}
-
-	_, err = os.Stdout.Write(decryptedData)
-	if err != nil {
-		return fmt.Errorf("failed to write to stdout: %v", err)
-	}
-
-	return nil
-}
-
-func EncryptStdinStdout(symmetricKey []byte) error {
-	data, err := io.ReadAll(os.Stdin)
-	if err != nil {
-		return fmt.Errorf("failed to read from stdin: %v", err)
-	}
-
-	encryptedData, err := EncryptFileContent(data, symmetricKey)
-	if err != nil {
-		return fmt.Errorf("failed to encrypt data: %v", err)
-	}
-
-	_, err = os.Stdout.Write(encryptedData)
-	if err != nil {
-		return fmt.Errorf("failed to write to stdout: %v", err)
-	}
-
-	return nil
 }
 
 func checkGitConfig(section string) (bool, error) {
@@ -329,7 +233,7 @@ func Lock(symmetricKey []byte) error {
 		}
 
 		// Encrypt the file
-		encryptedData, err := EncryptFileContent(data, symmetricKey)
+		encryptedData, err := services.EncryptFileContent(data, symmetricKey)
 		if err != nil {
 			return fmt.Errorf("failed to encrypt file %s: %v", file, err)
 		}
@@ -373,7 +277,7 @@ func Unlock(symmetricKey []byte) error {
 		}
 
 		// Decrypt the file
-		plaintext, err := decryptFileContent(data, symmetricKey)
+		plaintext, err := services.DecryptFileContent(data, symmetricKey)
 		if err != nil {
 			return fmt.Errorf("failed to decrypt file %s: %v", file, err)
 		}
@@ -410,12 +314,12 @@ func EncryptDecryptFileMeh(inputPath, outputPath, keyfilePath string, encrypt bo
 	// Step 7: Encrypt or decrypt the file data
 	var outputData []byte
 	if encrypt {
-		outputData, err = EncryptFileContent(fileData, symmetricKey)
+		outputData, err = services.EncryptFileContent(fileData, symmetricKey)
 		if err != nil {
 			return fmt.Errorf("failed to encrypt file: %v", err)
 		}
 	} else {
-		outputData, err = decryptFileContent(fileData, symmetricKey)
+		outputData, err = services.DecryptFileContent(fileData, symmetricKey)
 		if err != nil {
 			return fmt.Errorf("failed to decrypt file: %v", err)
 		}

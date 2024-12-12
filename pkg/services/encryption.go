@@ -1,9 +1,15 @@
 package services
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
 	"crypto/sha256"
+	"fmt"
 	"github.com/pamelia/git-crypt/pkg/constants"
 	"golang.org/x/crypto/pbkdf2"
+	"io"
+	"os"
 )
 
 func IsEncrypted(data []byte) bool {
@@ -23,4 +29,49 @@ func IsEncrypted(data []byte) bool {
 
 func DeriveKey(password string, salt []byte) []byte {
 	return pbkdf2.Key([]byte(password), salt, 200000, 32, sha256.New)
+}
+
+func EncryptData(data, key []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	aesGCM, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	nonce := make([]byte, aesGCM.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, err
+	}
+	return aesGCM.Seal(nonce, nonce, data, nil), nil
+}
+
+func EncryptFileContent(data, key []byte) ([]byte, error) {
+	encryptedData, err := EncryptData(data, key)
+	if err != nil {
+		return nil, err
+	}
+
+	// Prepend the file header to the encrypted data
+	return append(constants.FileHeader, encryptedData...), nil
+}
+
+func EncryptStdinStdout(symmetricKey []byte) error {
+	data, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		return fmt.Errorf("failed to read from stdin: %v", err)
+	}
+
+	encryptedData, err := EncryptFileContent(data, symmetricKey)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt data: %v", err)
+	}
+
+	_, err = os.Stdout.Write(encryptedData)
+	if err != nil {
+		return fmt.Errorf("failed to write to stdout: %v", err)
+	}
+
+	return nil
 }

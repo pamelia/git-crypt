@@ -2,28 +2,21 @@ package utils
 
 import (
 	"bufio"
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/rand"
-	"crypto/sha256"
 	"errors"
 	"fmt"
+	"github.com/pamelia/git-crypt/pkg/services"
 	"github.com/zalando/go-keyring"
-	"golang.org/x/crypto/pbkdf2"
-	"golang.org/x/crypto/ssh/terminal"
-	"io"
+	"golang.org/x/term"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 )
 
-// FileHeader is a predefined marker to identify encrypted files
-var FileHeader = []byte("GITCRYPT")
-
 func ReadPassword(msg string) (string, error) {
 	fmt.Print(msg)
-	bytePassword, err := terminal.ReadPassword(int(os.Stdin.Fd()))
+	bytePassword, err := term.ReadPassword(int(os.Stdin.Fd()))
 	fmt.Println()
 	if err != nil {
 		return "", err
@@ -44,43 +37,6 @@ func GeneratePassword() (string, error) {
 		return "", fmt.Errorf("passwords do not match")
 	}
 	return passwd, nil
-}
-
-func DeriveKey(password string, salt []byte) []byte {
-	return pbkdf2.Key([]byte(password), salt, 100000, 32, sha256.New)
-}
-
-func EncryptData(data, key []byte) ([]byte, error) {
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-	aesGCM, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, err
-	}
-	nonce := make([]byte, aesGCM.NonceSize())
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return nil, err
-	}
-	return aesGCM.Seal(nonce, nonce, data, nil), nil
-}
-
-func DecryptData(encrypted, key []byte) ([]byte, error) {
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-	aesGCM, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, err
-	}
-	nonceSize := aesGCM.NonceSize()
-	if len(encrypted) < nonceSize {
-		return nil, fmt.Errorf("ciphertext too short")
-	}
-	nonce, ciphertext := encrypted[:nonceSize], encrypted[nonceSize:]
-	return aesGCM.Open(nil, nonce, ciphertext, nil)
 }
 
 func GenerateRandomBytes(length int) ([]byte, error) {
@@ -114,8 +70,8 @@ func GetKey(keyFileName string) ([]byte, error) {
 	}
 
 	salt, encryptedKey := data[:16], data[16:]
-	derivedKey := DeriveKey(password, salt)
-	symmetricKey, err := DecryptData(encryptedKey, derivedKey)
+	derivedKey := services.DeriveKey(password, salt)
+	symmetricKey, err := services.DecryptData(encryptedKey, derivedKey)
 	if err != nil {
 		return []byte{}, fmt.Errorf("failed to decrypt symmetric key: %v", err)
 	}
@@ -123,153 +79,7 @@ func GetKey(keyFileName string) ([]byte, error) {
 	return symmetricKey, nil
 }
 
-func isEncrypted(data []byte) bool {
-	// Skip leading null bytes
-	for len(data) > 0 && data[0] == 0 {
-		data = data[1:]
-	}
-
-	// Check if the remaining data is long enough to contain the header
-	if len(data) < len(FileHeader) {
-		return false
-	}
-
-	// Compare the file header
-	return string(data[:len(FileHeader)]) == string(FileHeader)
-}
-
-func EncryptFileContent(data, key []byte) ([]byte, error) {
-	encryptedData, err := EncryptData(data, key)
-	if err != nil {
-		return nil, err
-	}
-
-	// Prepend the file header to the encrypted data
-	return append(FileHeader, encryptedData...), nil
-}
-
-func decryptFileContent(data, key []byte) ([]byte, error) {
-	if !isEncrypted(data) {
-		return nil, errors.New("file does not have a valid encryption header")
-	}
-
-	// Remove the file header
-	encryptedData := data[len(FileHeader):]
-
-	return DecryptData(encryptedData, key)
-}
-
-func DecryptStdinStdout(symmetricKey []byte) error {
-	data, err := io.ReadAll(os.Stdin)
-	if err != nil {
-		return fmt.Errorf("failed to read from stdin: %v", err)
-	}
-
-	decryptedData, err := decryptFileContent(data, symmetricKey)
-	if err != nil {
-		return fmt.Errorf("failed to decrypt data: %v", err)
-	}
-
-	_, err = os.Stdout.Write(decryptedData)
-	if err != nil {
-		return fmt.Errorf("failed to write to stdout: %v", err)
-	}
-
-	return nil
-}
-
-func EncryptStdinStdout(symmetricKey []byte) error {
-	data, err := io.ReadAll(os.Stdin)
-	if err != nil {
-		return fmt.Errorf("failed to read from stdin: %v", err)
-	}
-
-	encryptedData, err := EncryptFileContent(data, symmetricKey)
-	if err != nil {
-		return fmt.Errorf("failed to encrypt data: %v", err)
-	}
-
-	_, err = os.Stdout.Write(encryptedData)
-	if err != nil {
-		return fmt.Errorf("failed to write to stdout: %v", err)
-	}
-
-	return nil
-}
-
-func checkGitConfig(section string) (bool, error) {
-	file, err := os.Open(".git/config")
-	if err != nil {
-		return false, fmt.Errorf("failed to open .git/config: %v", err)
-	}
-	defer func(file *os.File) {
-		err := file.Close()
-		if err != nil {
-			panic(err)
-		}
-	}(file)
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		if strings.TrimSpace(scanner.Text()) == section {
-			return true, nil
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return false, fmt.Errorf("error reading .git/config: %v", err)
-	}
-
-	return false, nil
-}
-
-func appendGitConfig() error {
-	configContent := `
-[filter "git-crypt"]
-        smudge = git-crypt smudge
-        clean = git-crypt clean
-        required = true
-`
-	file, err := os.OpenFile(".git/config", os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to open .git/config for appending: %v", err)
-	}
-	defer func(file *os.File) {
-		err := file.Close()
-		if err != nil {
-			panic(err)
-		}
-	}(file)
-
-	_, err = file.WriteString(configContent)
-	if err != nil {
-		return fmt.Errorf("failed to write to .git/config: %v", err)
-	}
-
-	return nil
-}
-
-func CheckAndFixGitConfig() error {
-	filterExists, err := checkGitConfig("[filter \"git-crypt\"]")
-	if err != nil {
-		return err
-	}
-
-	if !filterExists {
-		fmt.Println("Appending git-crypt configuration to .git/config...")
-		err = appendGitConfig()
-		if err != nil {
-			return err
-		}
-		fmt.Println("Configuration appended successfully.")
-	} else {
-		fmt.Println("git-crypt configuration already exists in .git/config.")
-	}
-
-	return nil
-}
-
-func getGitCryptFiles() ([]string, error) {
+func GetGitCryptFiles() ([]string, error) {
 	// Open the .gitattributes file
 	file, err := os.Open(".gitattributes")
 	if err != nil {
@@ -330,95 +140,6 @@ func getGitCryptFiles() ([]string, error) {
 	return files, nil
 }
 
-func Lock(symmetricKey []byte) error {
-	// Get the list of files with the `filter=git-crypt` attribute
-	files, err := getGitCryptFiles()
-	if err != nil {
-		return fmt.Errorf("failed to get git-crypt files: %v", err)
-	}
-
-	for _, file := range files {
-		fmt.Printf("Locking file %s...\n", file)
-		// Read the file content
-		data, err := os.ReadFile(file)
-		if err != nil {
-			return fmt.Errorf("failed to read file %s: %v", file, err)
-		}
-
-		// Skip files that are already encrypted
-		if isEncrypted(data) {
-			continue
-		}
-
-		// Encrypt the file
-		encryptedData, err := EncryptFileContent(data, symmetricKey)
-		if err != nil {
-			return fmt.Errorf("failed to encrypt file %s: %v", file, err)
-		}
-
-		// Write the encrypted content back to the file
-		err = os.WriteFile(file, encryptedData, 0644)
-		if err != nil {
-			return fmt.Errorf("failed to write encrypted file %s: %v", file, err)
-		}
-	}
-
-	// Update Git index to match the working directory
-	err = exec.Command("git", "update-index", "--refresh").Run()
-	if err != nil {
-		return fmt.Errorf("failed to update Git index: %v", err)
-	}
-
-	fmt.Println("All files locked successfully.")
-	return nil
-}
-
-func Unlock(symmetricKey []byte) error {
-	// Get the list of files with the `filter=git-crypt` attribute
-	files, err := getGitCryptFiles()
-	if err != nil {
-		return fmt.Errorf("failed to get git-crypt files: %v", err)
-	}
-
-	for _, file := range files {
-		fmt.Printf("Unlocking file %s...\n", file)
-		// Read the file content
-		data, err := os.ReadFile(file)
-		if err != nil {
-			return fmt.Errorf("failed to read file %s: %v", file, err)
-		}
-
-		// Skip files that are already plaintext
-		if !isEncrypted(data) {
-			fmt.Printf("File %s is already plaintext.\n", file)
-			continue
-		}
-
-		// Decrypt the file
-		plaintext, err := decryptFileContent(data, symmetricKey)
-		if err != nil {
-			return fmt.Errorf("failed to decrypt file %s: %v", file, err)
-		}
-
-		// Write the plaintext content back to the file
-		err = os.WriteFile(file, plaintext, 0644)
-		if err != nil {
-			return fmt.Errorf("failed to write decrypted file %s: %v", file, err)
-		}
-	}
-
-	// Update Git index to match the working directory
-	err = exec.Command("git", "update-index", "--refresh").Run()
-	if err != nil {
-		return fmt.Errorf("failed to update Git index: %v", err)
-	}
-
-	fmt.Println("All files unlocked successfully.")
-	return nil
-}
-
-// EncryptDecryptFileMeh encrypts or decrypts a file using the git-crypt tool
-// This is a temporary function to test the git-crypt tool
 func EncryptDecryptFileMeh(inputPath, outputPath, keyfilePath string, encrypt bool) error {
 	symmetricKey, err := GetKey(keyfilePath)
 	if err != nil {
@@ -434,12 +155,12 @@ func EncryptDecryptFileMeh(inputPath, outputPath, keyfilePath string, encrypt bo
 	// Step 7: Encrypt or decrypt the file data
 	var outputData []byte
 	if encrypt {
-		outputData, err = EncryptFileContent(fileData, symmetricKey)
+		outputData, err = services.EncryptFileContent(fileData, symmetricKey)
 		if err != nil {
 			return fmt.Errorf("failed to encrypt file: %v", err)
 		}
 	} else {
-		outputData, err = decryptFileContent(fileData, symmetricKey)
+		outputData, err = services.DecryptFileContent(fileData, symmetricKey)
 		if err != nil {
 			return fmt.Errorf("failed to decrypt file: %v", err)
 		}
@@ -470,27 +191,4 @@ func CheckGitDirectory() error {
 	}
 
 	return nil
-}
-
-func GetTrackedFiles() ([]string, error) {
-	cmd := exec.Command("git", "ls-files")
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list tracked files: %v", err)
-	}
-
-	files := strings.Split(strings.TrimSpace(string(output)), "\n")
-	return files, nil
-}
-
-func CheckEncryptionStatus(file string) (string, error) {
-	data, err := os.ReadFile(file)
-	if err != nil {
-		return "", fmt.Errorf("failed to read file: %v", err)
-	}
-
-	if isEncrypted(data) {
-		return "encrypted", nil
-	}
-	return "not encrypted", nil
 }

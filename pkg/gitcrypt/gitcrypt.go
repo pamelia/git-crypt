@@ -2,13 +2,15 @@ package gitcrypt
 
 import (
 	"fmt"
+	"github.com/pamelia/git-crypt/pkg/constants"
+	"github.com/pamelia/git-crypt/pkg/git"
+	"github.com/pamelia/git-crypt/pkg/services"
 	"github.com/pamelia/git-crypt/pkg/utils"
 	"github.com/zalando/go-keyring"
 	"log"
 	"os"
+	"os/exec"
 )
-
-var KeyFileName = ".git-crypt.key"
 
 func Init() error {
 	// check if .git directory exists
@@ -18,7 +20,7 @@ func Init() error {
 	}
 	// check if key file exists
 	keyExists := false
-	if _, err := os.Stat(KeyFileName); err == nil {
+	if _, err := os.Stat(constants.KeyFileName); err == nil {
 		keyExists = true
 	}
 	if keyExists {
@@ -32,7 +34,7 @@ func Init() error {
 			return err
 		}
 	}
-	err = utils.CheckAndFixGitConfig()
+	err = git.CheckAndFixGitConfig()
 	if err != nil {
 		return err
 	}
@@ -62,7 +64,7 @@ func InitKeyExists() error {
 	fmt.Printf("Ok trying to decrypt key using password %s\n", userPassword)
 
 	// Validate the password by attempting to decrypt the encrypted key file
-	data, err := os.ReadFile(KeyFileName)
+	data, err := os.ReadFile(constants.KeyFileName)
 	if err != nil {
 		return fmt.Errorf("failed to read encrypted key file: %v", err)
 	}
@@ -71,9 +73,9 @@ func InitKeyExists() error {
 	salt, encryptedKey := data[:16], data[16:]
 
 	// Derive the decryption key from the provided password
-	derivedKey := utils.DeriveKey(userPassword, salt)
+	derivedKey := services.DeriveKey(userPassword, salt)
 
-	_, err = utils.DecryptData(encryptedKey, derivedKey)
+	_, err = services.DecryptData(encryptedKey, derivedKey)
 	if err != nil {
 		return fmt.Errorf("failed to decrypt key: %v", err)
 	}
@@ -106,10 +108,10 @@ func InitNewKey() error {
 	if err != nil {
 		return fmt.Errorf("failed to generate salt: %v", err)
 	}
-	derivedKey := utils.DeriveKey(password, salt)
+	derivedKey := services.DeriveKey(password, salt)
 
 	// Step 4: Encrypt the symmetric key with the derived key
-	encryptedKey, err := utils.EncryptData(symmetricKey, derivedKey)
+	encryptedKey, err := services.EncryptData(symmetricKey, derivedKey)
 	if err != nil {
 		return fmt.Errorf("failed to encrypt key: %v", err)
 	}
@@ -137,13 +139,13 @@ func InitNewKey() error {
 }
 
 func Status() error {
-	files, err := utils.GetTrackedFiles()
+	files, err := git.GetTrackedFiles()
 	if err != nil {
 		return fmt.Errorf("failed to get tracked files: %v", err)
 	}
 
 	for _, file := range files {
-		status, err := utils.CheckEncryptionStatus(file)
+		status, err := services.CheckEncryptionStatus(file)
 		if err != nil {
 			fmt.Printf("Error checking file %s: %v\n", file, err)
 			continue
@@ -155,45 +157,118 @@ func Status() error {
 	return nil
 }
 
-func Lock() {
-	symmetricKey, err := utils.GetKey(KeyFileName)
+func Lock() error {
+	symmetricKey, err := utils.GetKey(constants.KeyFileName)
 	if err != nil {
 		log.Fatalf("Error getting key: %v", err)
 	}
-	err = utils.Lock(symmetricKey)
+	// Get the list of files with the `filter=git-crypt` attribute
+	files, err := utils.GetGitCryptFiles()
 	if err != nil {
-		log.Fatalf("Error locking repository: %v", err)
+		return fmt.Errorf("failed to get git-crypt files: %v", err)
 	}
+
+	for _, file := range files {
+		fmt.Printf("Locking file %s...\n", file)
+		// Read the file content
+		data, err := os.ReadFile(file)
+		if err != nil {
+			return fmt.Errorf("failed to read file %s: %v", file, err)
+		}
+
+		// Skip files that are already encrypted
+		if services.IsEncrypted(data) {
+			continue
+		}
+
+		// Encrypt the file
+		encryptedData, err := services.EncryptFileContent(data, symmetricKey)
+		if err != nil {
+			return fmt.Errorf("failed to encrypt file %s: %v", file, err)
+		}
+
+		// Write the encrypted content back to the file
+		err = os.WriteFile(file, encryptedData, 0644)
+		if err != nil {
+			return fmt.Errorf("failed to write encrypted file %s: %v", file, err)
+		}
+	}
+
+	// Update Git index to match the working directory
+	err = exec.Command("git", "update-index", "--refresh").Run()
+	if err != nil {
+		return fmt.Errorf("failed to update Git index: %v", err)
+	}
+
+	fmt.Println("All files locked successfully.")
+	return nil
 }
 
-func Unlock() {
-	symmetricKey, err := utils.GetKey(KeyFileName)
+func Unlock() error {
+	symmetricKey, err := utils.GetKey(constants.KeyFileName)
 	if err != nil {
 		log.Fatalf("Error getting key: %v", err)
 	}
-	err = utils.Unlock(symmetricKey)
+	// Get the list of files with the `filter=git-crypt` attribute
+	files, err := utils.GetGitCryptFiles()
 	if err != nil {
-		log.Fatalf("Error unlocking repository: %v", err)
+		return fmt.Errorf("failed to get git-crypt files: %v", err)
 	}
+
+	for _, file := range files {
+		fmt.Printf("Unlocking file %s...\n", file)
+		// Read the file content
+		data, err := os.ReadFile(file)
+		if err != nil {
+			return fmt.Errorf("failed to read file %s: %v", file, err)
+		}
+
+		// Skip files that are already plaintext
+		if !services.IsEncrypted(data) {
+			fmt.Printf("File %s is already plaintext.\n", file)
+			continue
+		}
+
+		// Decrypt the file
+		plaintext, err := services.DecryptFileContent(data, symmetricKey)
+		if err != nil {
+			return fmt.Errorf("failed to decrypt file %s: %v", file, err)
+		}
+
+		// Write the plaintext content back to the file
+		err = os.WriteFile(file, plaintext, 0644)
+		if err != nil {
+			return fmt.Errorf("failed to write decrypted file %s: %v", file, err)
+		}
+	}
+
+	// Update Git index to match the working directory
+	err = exec.Command("git", "update-index", "--refresh").Run()
+	if err != nil {
+		return fmt.Errorf("failed to update Git index: %v", err)
+	}
+
+	fmt.Println("All files unlocked successfully.")
+	return nil
 }
 
 func Decrypt() {
-	symmetricKey, err := utils.GetKey(KeyFileName)
+	symmetricKey, err := utils.GetKey(constants.KeyFileName)
 	if err != nil {
 		log.Fatalf("Error getting key: %v", err)
 	}
-	err = utils.DecryptStdinStdout(symmetricKey)
+	err = services.DecryptStdinStdout(symmetricKey)
 	if err != nil {
 		log.Fatalf("Error decrypting stdin/stdout: %v", err)
 	}
 }
 
 func Encrypt() {
-	symmetricKey, err := utils.GetKey(KeyFileName)
+	symmetricKey, err := utils.GetKey(constants.KeyFileName)
 	if err != nil {
 		log.Fatalf("Error getting key: %v", err)
 	}
-	err = utils.EncryptStdinStdout(symmetricKey)
+	err = services.EncryptStdinStdout(symmetricKey)
 	if err != nil {
 		log.Fatalf("Error encrypting stdin/stdout: %v", err)
 	}
@@ -211,13 +286,13 @@ func Debug() {
 	encryptedFile := "test.txt.enc"
 	decryptedFile := "test.txt.dec"
 	// Encrypt a file
-	err = utils.EncryptDecryptFileMeh(inputFile, encryptedFile, KeyFileName, true) // Encrypt
+	err = utils.EncryptDecryptFileMeh(inputFile, encryptedFile, constants.KeyFileName, true) // Encrypt
 	if err != nil {
 		log.Fatalf("Error encrypting file: %v", err)
 	}
 
 	// Decrypt the file
-	err = utils.EncryptDecryptFileMeh(encryptedFile, decryptedFile, KeyFileName, false) // Decrypt
+	err = utils.EncryptDecryptFileMeh(encryptedFile, decryptedFile, constants.KeyFileName, false) // Decrypt
 	if err != nil {
 		log.Fatalf("Error decrypting file: %v", err)
 	}

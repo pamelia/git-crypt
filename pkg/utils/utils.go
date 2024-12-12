@@ -3,7 +3,7 @@ package utils
 import (
 	"crypto/rand"
 	"fmt"
-	"github.com/pamelia/git-crypt/pkg/services"
+	"github.com/pamelia/git-crypt/pkg/crypto"
 	"github.com/zalando/go-keyring"
 	"golang.org/x/term"
 	"os"
@@ -66,8 +66,8 @@ func GetKey(keyFileName string) ([]byte, error) {
 	}
 
 	salt, encryptedKey := data[:16], data[16:]
-	derivedKey := services.DeriveKey(password, salt)
-	symmetricKey, err := services.DecryptData(encryptedKey, derivedKey)
+	derivedKey := crypto.DeriveKey(password, salt)
+	symmetricKey, err := crypto.DecryptData(encryptedKey, derivedKey)
 	if err != nil {
 		return []byte{}, fmt.Errorf("failed to decrypt symmetric key: %v", err)
 	}
@@ -90,12 +90,12 @@ func EncryptDecryptFileMeh(inputPath, outputPath, keyfilePath string, encrypt bo
 	// Step 7: Encrypt or decrypt the file data
 	var outputData []byte
 	if encrypt {
-		outputData, err = services.EncryptFileContent(fileData, symmetricKey)
+		outputData, err = crypto.EncryptFileContent(fileData, symmetricKey)
 		if err != nil {
 			return fmt.Errorf("failed to encrypt file: %v", err)
 		}
 	} else {
-		outputData, err = services.DecryptFileContent(fileData, symmetricKey)
+		outputData, err = crypto.DecryptFileContent(fileData, symmetricKey)
 		if err != nil {
 			return fmt.Errorf("failed to decrypt file: %v", err)
 		}

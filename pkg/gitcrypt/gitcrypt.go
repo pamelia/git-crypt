@@ -3,7 +3,7 @@ package gitcrypt
 import (
 	"fmt"
 	"github.com/pamelia/git-crypt/pkg/constants"
-	"github.com/pamelia/git-crypt/pkg/crypto"
+	"github.com/pamelia/git-crypt/pkg/cryptotools"
 	"github.com/pamelia/git-crypt/pkg/git"
 	"github.com/pamelia/git-crypt/pkg/utils"
 	"github.com/zalando/go-keyring"
@@ -73,9 +73,9 @@ func InitKeyExists() error {
 	salt, encryptedKey := data[:16], data[16:]
 
 	// Derive the decryption key from the provided password
-	derivedKey := crypto.DeriveKey(userPassword, salt)
+	derivedKey := cryptotools.DeriveKey(userPassword, salt)
 
-	_, err = crypto.DecryptData(encryptedKey, derivedKey)
+	_, err = cryptotools.DecryptData(encryptedKey, derivedKey)
 	if err != nil {
 		return fmt.Errorf("failed to decrypt key: %v", err)
 	}
@@ -108,10 +108,10 @@ func InitNewKey() error {
 	if err != nil {
 		return fmt.Errorf("failed to generate salt: %v", err)
 	}
-	derivedKey := crypto.DeriveKey(password, salt)
+	derivedKey := cryptotools.DeriveKey(password, salt)
 
 	// Step 4: Encrypt the symmetric key with the derived key
-	encryptedKey, err := crypto.EncryptData(symmetricKey, derivedKey)
+	encryptedKey, err := cryptotools.EncryptData(symmetricKey, derivedKey)
 	if err != nil {
 		return fmt.Errorf("failed to encrypt key: %v", err)
 	}
@@ -145,7 +145,7 @@ func Status() error {
 	}
 
 	for _, file := range files {
-		status, err := crypto.CheckEncryptionStatus(file)
+		status, err := cryptotools.CheckEncryptionStatus(file)
 		if err != nil {
 			fmt.Printf("Error checking file %s: %v\n", file, err)
 			continue
@@ -158,7 +158,7 @@ func Status() error {
 }
 
 func Lock() error {
-	symmetricKey, err := crypto.GetKey(constants.KeyFileName)
+	symmetricKey, err := cryptotools.GetKey(constants.KeyFileName)
 	if err != nil {
 		return fmt.Errorf("failed to get key: %v", err)
 	}
@@ -177,12 +177,12 @@ func Lock() error {
 		}
 
 		// Skip files that are already encrypted
-		if crypto.IsEncrypted(data) {
+		if cryptotools.IsEncrypted(data) {
 			continue
 		}
 
 		// Encrypt the file
-		encryptedData, err := crypto.EncryptFileContent(data, symmetricKey)
+		encryptedData, err := cryptotools.EncryptFileContent(data, symmetricKey)
 		if err != nil {
 			return fmt.Errorf("failed to encrypt file %s: %v", file, err)
 		}
@@ -205,7 +205,7 @@ func Lock() error {
 }
 
 func Unlock() error {
-	symmetricKey, err := crypto.GetKey(constants.KeyFileName)
+	symmetricKey, err := cryptotools.GetKey(constants.KeyFileName)
 	if err != nil {
 		return fmt.Errorf("failed to get key: %v", err)
 	}
@@ -224,13 +224,13 @@ func Unlock() error {
 		}
 
 		// Skip files that are already plaintext
-		if !crypto.IsEncrypted(data) {
+		if !cryptotools.IsEncrypted(data) {
 			fmt.Printf("File %s is already plaintext.\n", file)
 			continue
 		}
 
 		// Decrypt the file
-		plaintext, err := crypto.DecryptFileContent(data, symmetricKey)
+		plaintext, err := cryptotools.DecryptFileContent(data, symmetricKey)
 		if err != nil {
 			return fmt.Errorf("failed to decrypt file %s: %v", file, err)
 		}
@@ -253,11 +253,11 @@ func Unlock() error {
 }
 
 func Decrypt() error {
-	symmetricKey, err := crypto.GetKey(constants.KeyFileName)
+	symmetricKey, err := cryptotools.GetKey(constants.KeyFileName)
 	if err != nil {
 		return fmt.Errorf("failed to get key: %v", err)
 	}
-	err = crypto.DecryptStdinStdout(symmetricKey)
+	err = cryptotools.DecryptStdinStdout(symmetricKey)
 	if err != nil {
 		log.Fatalf("Error decrypting stdin/stdout: %v", err)
 	}
@@ -265,11 +265,11 @@ func Decrypt() error {
 }
 
 func Encrypt() error {
-	symmetricKey, err := crypto.GetKey(constants.KeyFileName)
+	symmetricKey, err := cryptotools.GetKey(constants.KeyFileName)
 	if err != nil {
 		return fmt.Errorf("failed to get key: %v", err)
 	}
-	err = crypto.EncryptStdinStdout(symmetricKey)
+	err = cryptotools.EncryptStdinStdout(symmetricKey)
 	if err != nil {
 		log.Fatalf("Error encrypting stdin/stdout: %v", err)
 	}
@@ -288,13 +288,13 @@ func Debug() error {
 	encryptedFile := "test.txt.enc"
 	decryptedFile := "test.txt.dec"
 	// Encrypt a file
-	err = crypto.EncryptDecryptFile(inputFile, encryptedFile, constants.KeyFileName, true) // Encrypt
+	err = cryptotools.EncryptDecryptFile(inputFile, encryptedFile, constants.KeyFileName, true) // Encrypt
 	if err != nil {
 		return fmt.Errorf("failed to encrypt file: %v", err)
 	}
 
 	// Decrypt the file
-	err = crypto.EncryptDecryptFile(encryptedFile, decryptedFile, constants.KeyFileName, false) // Decrypt
+	err = cryptotools.EncryptDecryptFile(encryptedFile, decryptedFile, constants.KeyFileName, false) // Decrypt
 	if err != nil {
 		return fmt.Errorf("failed to decrypt file: %v", err)
 	}

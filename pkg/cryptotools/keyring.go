@@ -1,4 +1,4 @@
-package crypto
+package cryptotools
 
 import (
 	"fmt"

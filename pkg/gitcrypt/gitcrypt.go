@@ -14,7 +14,7 @@ import (
 
 func Init() error {
 	// check if .git directory exists
-	err := utils.CheckGitDirectory()
+	err := git.CheckGitDirectory()
 	if err != nil {
 		return err
 	}
@@ -163,7 +163,7 @@ func Lock() error {
 		log.Fatalf("Error getting key: %v", err)
 	}
 	// Get the list of files with the `filter=git-crypt` attribute
-	files, err := utils.GetGitCryptFiles()
+	files, err := git.GetGitCryptFiles()
 	if err != nil {
 		return fmt.Errorf("failed to get git-crypt files: %v", err)
 	}
@@ -210,7 +210,7 @@ func Unlock() error {
 		log.Fatalf("Error getting key: %v", err)
 	}
 	// Get the list of files with the `filter=git-crypt` attribute
-	files, err := utils.GetGitCryptFiles()
+	files, err := git.GetGitCryptFiles()
 	if err != nil {
 		return fmt.Errorf("failed to get git-crypt files: %v", err)
 	}

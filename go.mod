@@ -5,7 +5,7 @@ go 1.23.3
 require (
 	github.com/spf13/cobra v1.8.1
 	github.com/zalando/go-keyring v0.2.6
-	golang.org/x/crypto v0.30.0
+	golang.org/x/crypto v0.31.0
 )
 
 require (

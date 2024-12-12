@@ -2,14 +2,13 @@ package gitcrypt
 
 import (
 	"fmt"
+	"github.com/pamelia/git-crypt/pkg/constants"
 	"github.com/pamelia/git-crypt/pkg/services"
 	"github.com/pamelia/git-crypt/pkg/utils"
 	"github.com/zalando/go-keyring"
 	"log"
 	"os"
 )
-
-var KeyFileName = ".git-crypt.key"
 
 func Init() error {
 	// check if .git directory exists
@@ -19,7 +18,7 @@ func Init() error {
 	}
 	// check if key file exists
 	keyExists := false
-	if _, err := os.Stat(KeyFileName); err == nil {
+	if _, err := os.Stat(constants.KeyFileName); err == nil {
 		keyExists = true
 	}
 	if keyExists {
@@ -63,7 +62,7 @@ func InitKeyExists() error {
 	fmt.Printf("Ok trying to decrypt key using password %s\n", userPassword)
 
 	// Validate the password by attempting to decrypt the encrypted key file
-	data, err := os.ReadFile(KeyFileName)
+	data, err := os.ReadFile(constants.KeyFileName)
 	if err != nil {
 		return fmt.Errorf("failed to read encrypted key file: %v", err)
 	}
@@ -157,7 +156,7 @@ func Status() error {
 }
 
 func Lock() {
-	symmetricKey, err := utils.GetKey(KeyFileName)
+	symmetricKey, err := utils.GetKey(constants.KeyFileName)
 	if err != nil {
 		log.Fatalf("Error getting key: %v", err)
 	}
@@ -168,7 +167,7 @@ func Lock() {
 }
 
 func Unlock() {
-	symmetricKey, err := utils.GetKey(KeyFileName)
+	symmetricKey, err := utils.GetKey(constants.KeyFileName)
 	if err != nil {
 		log.Fatalf("Error getting key: %v", err)
 	}
@@ -179,7 +178,7 @@ func Unlock() {
 }
 
 func Decrypt() {
-	symmetricKey, err := utils.GetKey(KeyFileName)
+	symmetricKey, err := utils.GetKey(constants.KeyFileName)
 	if err != nil {
 		log.Fatalf("Error getting key: %v", err)
 	}
@@ -190,7 +189,7 @@ func Decrypt() {
 }
 
 func Encrypt() {
-	symmetricKey, err := utils.GetKey(KeyFileName)
+	symmetricKey, err := utils.GetKey(constants.KeyFileName)
 	if err != nil {
 		log.Fatalf("Error getting key: %v", err)
 	}
@@ -212,13 +211,13 @@ func Debug() {
 	encryptedFile := "test.txt.enc"
 	decryptedFile := "test.txt.dec"
 	// Encrypt a file
-	err = utils.EncryptDecryptFileMeh(inputFile, encryptedFile, KeyFileName, true) // Encrypt
+	err = utils.EncryptDecryptFileMeh(inputFile, encryptedFile, constants.KeyFileName, true) // Encrypt
 	if err != nil {
 		log.Fatalf("Error encrypting file: %v", err)
 	}
 
 	// Decrypt the file
-	err = utils.EncryptDecryptFileMeh(encryptedFile, decryptedFile, KeyFileName, false) // Decrypt
+	err = utils.EncryptDecryptFileMeh(encryptedFile, decryptedFile, constants.KeyFileName, false) // Decrypt
 	if err != nil {
 		log.Fatalf("Error decrypting file: %v", err)
 	}

@@ -1,30 +1,30 @@
 package cmd
 
 import (
-	"fmt"
+	"github.com/pamelia/git-crypt/pkg/gitcrypt"
 
 	"github.com/spf13/cobra"
 )
 
-// diffCmd represents the diff command
-var diffCmd = &cobra.Command{
-	Use:   "diff",
+// cleanCmd represents the clean command
+var cleanCmd = &cobra.Command{
+	Use:   "clean",
 	Short: "A brief description of your command",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("diff called")
+		gitcrypt.Encrypt()
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(diffCmd)
+	rootCmd.AddCommand(cleanCmd)
 
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	// diffCmd.PersistentFlags().String("foo", "", "A help for foo")
+	// cleanCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// diffCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// cleanCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/pamelia/git-crypt/pkg/constants"
+	"github.com/pamelia/git-crypt/pkg/services"
 	"github.com/zalando/go-keyring"
 	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/crypto/ssh/terminal"
@@ -121,21 +122,6 @@ func GetKey(keyFileName string) ([]byte, error) {
 	return symmetricKey, nil
 }
 
-func isEncrypted(data []byte) bool {
-	// Skip leading null bytes
-	for len(data) > 0 && data[0] == 0 {
-		data = data[1:]
-	}
-
-	// Check if the remaining data is long enough to contain the header
-	if len(data) < len(constants.FileHeader) {
-		return false
-	}
-
-	// Compare the file header
-	return string(data[:len(constants.FileHeader)]) == string(constants.FileHeader)
-}
-
 func EncryptFileContent(data, key []byte) ([]byte, error) {
 	encryptedData, err := EncryptData(data, key)
 	if err != nil {
@@ -147,7 +133,7 @@ func EncryptFileContent(data, key []byte) ([]byte, error) {
 }
 
 func decryptFileContent(data, key []byte) ([]byte, error) {
-	if !isEncrypted(data) {
+	if !services.IsEncrypted(data) {
 		return nil, errors.New("file does not have a valid encryption header")
 	}
 
@@ -344,7 +330,7 @@ func Lock(symmetricKey []byte) error {
 		}
 
 		// Skip files that are already encrypted
-		if isEncrypted(data) {
+		if services.IsEncrypted(data) {
 			continue
 		}
 
@@ -387,7 +373,7 @@ func Unlock(symmetricKey []byte) error {
 		}
 
 		// Skip files that are already plaintext
-		if !isEncrypted(data) {
+		if !services.IsEncrypted(data) {
 			fmt.Printf("File %s is already plaintext.\n", file)
 			continue
 		}
@@ -415,8 +401,6 @@ func Unlock(symmetricKey []byte) error {
 	return nil
 }
 
-// EncryptDecryptFileMeh encrypts or decrypts a file using the git-crypt tool
-// This is a temporary function to test the git-crypt tool
 func EncryptDecryptFileMeh(inputPath, outputPath, keyfilePath string, encrypt bool) error {
 	symmetricKey, err := GetKey(keyfilePath)
 	if err != nil {
@@ -487,7 +471,7 @@ func CheckEncryptionStatus(file string) (string, error) {
 		return "", fmt.Errorf("failed to read file: %v", err)
 	}
 
-	if isEncrypted(data) {
+	if services.IsEncrypted(data) {
 		return "encrypted", nil
 	}
 	return "not encrypted", nil

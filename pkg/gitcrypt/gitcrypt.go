@@ -160,7 +160,7 @@ func Status() error {
 func Lock() error {
 	symmetricKey, err := crypto.GetKey(constants.KeyFileName)
 	if err != nil {
-		log.Fatalf("Error getting key: %v", err)
+		return fmt.Errorf("failed to get key: %v", err)
 	}
 	// Get the list of files with the `filter=git-crypt` attribute
 	files, err := git.GetGitCryptFiles()
@@ -207,7 +207,7 @@ func Lock() error {
 func Unlock() error {
 	symmetricKey, err := crypto.GetKey(constants.KeyFileName)
 	if err != nil {
-		log.Fatalf("Error getting key: %v", err)
+		return fmt.Errorf("failed to get key: %v", err)
 	}
 	// Get the list of files with the `filter=git-crypt` attribute
 	files, err := git.GetGitCryptFiles()
@@ -252,49 +252,52 @@ func Unlock() error {
 	return nil
 }
 
-func Decrypt() {
+func Decrypt() error {
 	symmetricKey, err := crypto.GetKey(constants.KeyFileName)
 	if err != nil {
-		log.Fatalf("Error getting key: %v", err)
+		return fmt.Errorf("failed to get key: %v", err)
 	}
 	err = crypto.DecryptStdinStdout(symmetricKey)
 	if err != nil {
 		log.Fatalf("Error decrypting stdin/stdout: %v", err)
 	}
+	return nil
 }
 
-func Encrypt() {
+func Encrypt() error {
 	symmetricKey, err := crypto.GetKey(constants.KeyFileName)
 	if err != nil {
-		log.Fatalf("Error getting key: %v", err)
+		return fmt.Errorf("failed to get key: %v", err)
 	}
 	err = crypto.EncryptStdinStdout(symmetricKey)
 	if err != nil {
 		log.Fatalf("Error encrypting stdin/stdout: %v", err)
 	}
+	return nil
 }
 
-func Debug() {
+func Debug() error {
 	fmt.Println("Hello from git-crypt debug")
 
 	inputFile := "test.txt"
 	inputFileContent := []byte("Hello, world!")
 	err := os.WriteFile(inputFile, inputFileContent, 0600)
 	if err != nil {
-		log.Fatalf("Error writing test file %s: %v", inputFile, err)
+		return fmt.Errorf("failed to write test file %s: %v", inputFile, err)
 	}
 	encryptedFile := "test.txt.enc"
 	decryptedFile := "test.txt.dec"
 	// Encrypt a file
 	err = crypto.EncryptDecryptFile(inputFile, encryptedFile, constants.KeyFileName, true) // Encrypt
 	if err != nil {
-		log.Fatalf("Error encrypting file: %v", err)
+		return fmt.Errorf("failed to encrypt file: %v", err)
 	}
 
 	// Decrypt the file
 	err = crypto.EncryptDecryptFile(encryptedFile, decryptedFile, constants.KeyFileName, false) // Decrypt
 	if err != nil {
-		log.Fatalf("Error decrypting file: %v", err)
+		return fmt.Errorf("failed to decrypt file: %v", err)
 	}
 
+	return nil
 }

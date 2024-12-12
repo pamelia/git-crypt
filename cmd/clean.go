@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"github.com/pamelia/git-crypt/pkg/gitcrypt"
 
 	"github.com/spf13/cobra"
@@ -11,7 +12,10 @@ var cleanCmd = &cobra.Command{
 	Use:   "clean",
 	Short: "Command for git clean",
 	Run: func(cmd *cobra.Command, args []string) {
-		gitcrypt.Encrypt()
+		err := gitcrypt.Encrypt()
+		if err != nil {
+			fmt.Printf("Error: %s\n", err.Error())
+		}
 	},
 }
 

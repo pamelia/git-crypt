@@ -9,7 +9,7 @@ import (
 // lockCmd represents the lock command
 var lockCmd = &cobra.Command{
 	Use:   "lock",
-	Short: "A brief description of your command",
+	Short: "Encrypt all files in the repository",
 	Run: func(cmd *cobra.Command, args []string) {
 		err := gitcrypt.Lock()
 		if err != nil {

@@ -181,11 +181,10 @@ func GetRepoName() (string, error) {
 
 func UpdateIndex(file string) error {
 	cmd := exec.Command("git", "update-index", "--assume-unchanged", file)
-	output, err := cmd.Output()
+	_, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("failed to update Git index: %v", err)
 	}
 
-	fmt.Println(string(output))
 	return nil
 }

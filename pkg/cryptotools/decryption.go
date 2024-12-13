@@ -38,7 +38,7 @@ func DecryptData(encrypted, key []byte) ([]byte, error) {
 }
 
 func DecryptFileContent(data, key []byte) ([]byte, error) {
-	if IsEncrypted(data) {
+	if !IsEncrypted(data) {
 		return nil, errors.New("file does not have a valid encryption header")
 	}
 

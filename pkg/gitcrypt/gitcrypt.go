@@ -250,12 +250,12 @@ func Unlock() error {
 		if err != nil {
 			return fmt.Errorf("failed to write decrypted file %s: %v", file, err)
 		}
-	}
 
-	// Update Git index to match the working directory
-	err = exec.Command("git", "update-index", "--refresh").Run()
-	if err != nil {
-		return fmt.Errorf("failed to update Git index: %v", err)
+		// Tell git to assume the file is unchanged
+		err = exec.Command("git", "update-index", "--assume-unchanged", file).Run()
+		if err != nil {
+			return fmt.Errorf("failed to update Git index: %v", err)
+		}
 	}
 
 	fmt.Println("All files unlocked successfully.")

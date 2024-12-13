@@ -9,7 +9,6 @@ import (
 	"github.com/zalando/go-keyring"
 	"log"
 	"os"
-	"os/exec"
 )
 
 func Init() error {
@@ -200,12 +199,12 @@ func Lock() error {
 		if err != nil {
 			return fmt.Errorf("failed to write encrypted file %s: %v", file, err)
 		}
-	}
 
-	// Update Git index to match the working directory
-	err = exec.Command("git", "update-index", "--refresh").Run()
-	if err != nil {
-		return fmt.Errorf("failed to update Git index: %v", err)
+		// Tell git to assume the file is unchanged
+		err = git.UpdateIndex(file)
+		if err != nil {
+			return err
+		}
 	}
 
 	fmt.Println("All files locked successfully.")
@@ -252,9 +251,9 @@ func Unlock() error {
 		}
 
 		// Tell git to assume the file is unchanged
-		err = exec.Command("git", "update-index", "--assume-unchanged", file).Run()
+		err = git.UpdateIndex(file)
 		if err != nil {
-			return fmt.Errorf("failed to update Git index: %v", err)
+			return err
 		}
 	}
 

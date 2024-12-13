@@ -10,7 +10,7 @@ import (
 // unlockCmd represents the unlock command
 var unlockCmd = &cobra.Command{
 	Use:   "unlock",
-	Short: "A brief description of your command",
+	Short: "Decrypt all files in the repository",
 	Run: func(cmd *cobra.Command, args []string) {
 		err := gitcrypt.Unlock()
 		if err != nil {

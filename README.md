@@ -76,5 +76,13 @@ go install github.com/pamelia/git-crypt@latest
 ### Caveats
 
 - Only supports symmetric encryption using AES-256.
-- git-crypt status will report the key file `.git-crypt.key` as not encrypted even though it is.
 - Heavily relies on [zalando/go-keyring](https://github.com/zalando/go-keyring)
+
+### FAQ
+
+#### Why does `git-crypt status` say that the file `.git-crypt.key` is not encrypted?
+
+The file `.git-crypt.key` is encrypted but does not contain the header `GITCRYPT` and therefore it will be displayed as not encrypted. 
+This is by design because since it is in the git repo and is fed to `git-crypt` via `git ls-files` when you run `git-crypt lock` or `git-crypt unlock`.
+It is intentional to only have this file written to disk in encrypted form and not in plaintext form.
+The key is decrypted with the password in the system keyring everytime `git-crypt` performs encryption or decryption.

@@ -111,7 +111,18 @@ func CheckGitDirectory() error {
 }
 
 func GetGitCryptFiles() ([]string, error) {
-	file, err := os.Open(".gitattributes")
+	// First, locate the Git repository root.
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current directory: %v", err)
+	}
+
+	repoRoot, err := FindGitRoot(wd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find git root: %v", err)
+	}
+
+	file, err := os.Open(filepath.Join(repoRoot, ".gitattributes"))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf(".gitattributes file not found")
@@ -175,8 +186,32 @@ func GetRepoName() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	dirName := filepath.Base(wd)
-	return dirName, nil
+
+	gitRoot, err := FindGitRoot(wd)
+	if err != nil {
+		return "", err
+	}
+
+	// The repo name is just the base of the directory containing the .git folder.
+	return filepath.Base(gitRoot), nil
+}
+
+func FindGitRoot(startDir string) (string, error) {
+	dir := startDir
+	for {
+		// Check if .git exists in the current directory.
+		if info, err := os.Stat(filepath.Join(dir, ".git")); err == nil && info.IsDir() {
+			return dir, nil
+		}
+
+		// If we’ve reached the root (parent == current), stop searching.
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", fmt.Errorf("no .git directory found in any parent of %s", startDir)
+		}
+
+		dir = parent
+	}
 }
 
 func UpdateIndex(file string) error {
